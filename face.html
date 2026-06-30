@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Face · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --glow: #F2A6B4;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(242,166,180,0.14), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 1100px; margin: 0 auto; }
+.dash-title {
+  margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section { margin-top: 8px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after  { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+.gm-card {
+  position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px;
+  margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45); overflow: hidden;
+}
+.gm-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.gm-header-left { display: flex; flex-direction: column; }
+.gm-eyebrow {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 6px;
+}
+.gm-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+.gm-streak {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); color: var(--text-tertiary);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase;
+}
+.gm-streak.gm-streak-set { background: rgba(242,166,180,0.12); border-color: rgba(242,166,180,0.35); color: #FBDDE3; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+.stat { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px; }
+.stat-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1; }
+.stat-label { margin-top: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+
+.gm-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.gm-field label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); }
+.gm-row-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.gm-row-fields > .gm-field { flex: 1; min-width: 140px; }
+
+.gm-input, .gm-select {
+  padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
+  outline: none; transition: border-color 0.2s, background 0.2s; width: 100%;
+}
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-input:focus, .gm-select:focus { border-color: rgba(255,255,255,0.28); background: rgba(0,0,0,0.36); }
+.gm-select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+
+.gm-input-wrap {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.gm-add {
+  padding: 11px 20px; border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.35), 0 8px 22px rgba(0,0,0,0.25);
+  transition: transform 0.1s, filter 0.15s;
+}
+.gm-add:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.gm-add:active { transform: translateY(0); }
+
+.goal-list { list-style: none; margin: 0; padding: 0; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+
+.gm-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+  transition: background 0.2s, opacity 0.3s;
+}
+.gm-row:hover { background: rgba(255,255,255,0.06); }
+.gm-row.gm-row-done { opacity: 0.45; background: rgba(107,227,164,0.04); }
+.gm-row.gm-row-done .gm-text { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
+
+.gm-check {
+  appearance: none; -webkit-appearance: none; width: 22px; height: 22px; flex-shrink: 0; margin: 0;
+  border: 1.5px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.28); border-radius: 7px;
+  position: relative; cursor: pointer; transition: background 0.2s, border-color 0.2s, box-shadow 0.25s;
+}
+.gm-check:checked { background: var(--success); border-color: var(--success); box-shadow: 0 0 12px rgba(107,227,164,0.40); }
+.gm-check:checked::after {
+  content: ''; position: absolute; left: 6px; top: 2px; width: 6px; height: 11px;
+  border: solid #0A0A0B; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+}
+.gm-text { flex: 1; font-size: 14px; color: var(--text-primary); outline: none; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
+.gm-text[contenteditable="true"] { outline: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.28); }
+
+.session-icon { font-size: 18px; width: 26px; text-align: center; flex-shrink: 0; }
+.session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.session-title { font-size: 14px; color: var(--text-primary); font-weight: 600; }
+.session-meta { font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); }
+.session-notes { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+.goal-delete {
+  border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer;
+  padding: 0 4px; opacity: 0.5; transition: opacity 0.2s, color 0.2s; flex-shrink: 0;
+}
+.gm-row:hover .goal-delete { opacity: 1; }
+.goal-delete:hover { color: var(--danger); }
+
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .gm-card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="dash-title">Face</h1>
+
+  <!-- ===== Goals ===== -->
+  <div class="section">
+    <div class="section-title">Goals</div>
+    <div class="gm-card">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow">Looksmaxxing, the boring-but-effective version</div>
+          <div class="gm-sub">Consistency on the basics (skin, sleep, posture, grooming) beats any single hack.</div>
+        </div>
+        <span class="gm-streak" id="faceProfilePill">No focus set</span>
+      </div>
+
+      <div class="gm-row-fields">
+        <div class="gm-field">
+          <label for="faceSkinType">Skin type</label>
+          <select class="gm-select" id="faceSkinType">
+            <option value="">Not sure yet</option>
+            <option value="normal">Normal</option>
+            <option value="dry">Dry</option>
+            <option value="oily">Oily</option>
+            <option value="combination">Combination</option>
+            <option value="sensitive">Sensitive</option>
+          </select>
+        </div>
+        <div class="gm-field">
+          <label for="faceFocus">Focus areas</label>
+          <input class="gm-input" id="faceFocus" type="text" placeholder="e.g. clearer skin, jawline, hairline">
+        </div>
+      </div>
+
+      <div class="gm-field">
+        <label for="faceNotes">Notes</label>
+        <input class="gm-input" id="faceNotes" type="text" placeholder="Anything specific you're targeting?">
+      </div>
+
+      <div class="gm-input-wrap" style="border-top:0; padding-top:0; margin-top:0;">
+        <button class="gm-add" id="faceProfileSave" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Routine checklist ===== -->
+  <div class="section">
+    <div class="section-title">Routine Checklist</div>
+    <div class="gm-card">
+      <ul class="goal-list" id="faceGoalList"></ul>
+
+      <div class="gm-input-wrap">
+        <input class="gm-input" id="faceGoalInput" type="text" placeholder="Add a routine item…" autocomplete="off">
+        <button class="gm-add" id="faceGoalAdd" type="button">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Progress log ===== -->
+  <div class="section">
+    <div class="section-title">Progress Log</div>
+    <div class="gm-card">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-num" id="faceWeekCount">0</div><div class="stat-label">This week</div></div>
+        <div class="stat"><div class="stat-num" id="faceAvgRating">—</div><div class="stat-label">Avg rating</div></div>
+        <div class="stat"><div class="stat-num" id="faceTotalCount">0</div><div class="stat-label">All time</div></div>
+      </div>
+
+      <ul class="goal-list" id="faceLogList" style="margin-top:14px;"></ul>
+
+      <div class="gm-input-wrap">
+        <div class="gm-row-fields" style="width:100%; margin-bottom:0;">
+          <div class="gm-field">
+            <label for="faceLogDate">Date</label>
+            <input class="gm-input" id="faceLogDate" type="date">
+          </div>
+          <div class="gm-field">
+            <label for="faceLogCategory">Area</label>
+            <select class="gm-select" id="faceLogCategory">
+              <option value="skin">Skin</option>
+              <option value="hair">Hair</option>
+              <option value="body">Body / Posture</option>
+              <option value="grooming">Grooming</option>
+              <option value="general">General</option>
+            </select>
+          </div>
+          <div class="gm-field">
+            <label for="faceLogRating">Rating (1–10)</label>
+            <input class="gm-input" id="faceLogRating" type="number" min="1" max="10" placeholder="7">
+          </div>
+        </div>
+        <div class="gm-field" style="width:100%;">
+          <label for="faceLogNotes">Notes</label>
+          <input class="gm-input" id="faceLogNotes" type="text" placeholder="e.g. skin cleared up after cutting dairy">
+        </div>
+        <button class="gm-add" id="faceLogAdd" type="button">Add entry</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+
+<script>
+(function () {
+  'use strict';
+
+  const PROFILE_KEY = 'face:profile';
+  const GOALS_KEY = 'face:goals';
+  const LOG_KEY = 'face:log';
+
+  const STARTER_GOALS = [
+    'Cleanse & moisturize morning and night',
+    'Apply SPF every morning',
+    'Drink enough water daily',
+    'Sleep 7–9 hours',
+    'Fix posture & practice mewing',
+    'Get a haircut that suits your face shape',
+    'Watch sugar & dairy if they break you out',
+    'Smile more — it changes how a face reads',
+  ];
+
+  const CATEGORY_META = {
+    skin:     { icon: '✨', label: 'Skin' },
+    hair:     { icon: '💇', label: 'Hair' },
+    body:     { icon: '🧍', label: 'Body / Posture' },
+    grooming: { icon: '🪒', label: 'Grooming' },
+    general:  { icon: '🪞', label: 'General' },
+  };
+
+  function load(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
+    catch (e) { return fallback; }
+  }
+  function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function fmtDate(s) {
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  function startOfWeek(d) {
+    const x = new Date(d); x.setHours(0, 0, 0, 0);
+    const day = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - day);
+    return x;
+  }
+
+  // ---- Profile ----
+  const skinTypeEl = document.getElementById('faceSkinType');
+  const focusEl = document.getElementById('faceFocus');
+  const notesEl = document.getElementById('faceNotes');
+  const pillEl = document.getElementById('faceProfilePill');
+  const profileSaveBtn = document.getElementById('faceProfileSave');
+
+  function renderProfile() {
+    const p = load(PROFILE_KEY, {});
+    skinTypeEl.value = p.skinType || '';
+    focusEl.value = p.focus || '';
+    notesEl.value = p.notes || '';
+    if (p.focus) {
+      pillEl.textContent = p.focus;
+      pillEl.classList.add('gm-streak-set');
+    } else {
+      pillEl.textContent = 'No focus set';
+      pillEl.classList.remove('gm-streak-set');
+    }
+  }
+  profileSaveBtn.addEventListener('click', function () {
+    save(PROFILE_KEY, { skinType: skinTypeEl.value, focus: focusEl.value.trim(), notes: notesEl.value.trim() });
+    renderProfile();
+  });
+
+  // ---- Routine checklist ----
+  const goalListEl = document.getElementById('faceGoalList');
+  const goalInputEl = document.getElementById('faceGoalInput');
+  const goalAddBtn = document.getElementById('faceGoalAdd');
+
+  function ensureGoalsSeeded() {
+    if (localStorage.getItem(GOALS_KEY) == null) {
+      save(GOALS_KEY, STARTER_GOALS.map(function (text) { return { text: text, done: false }; }));
+    }
+  }
+
+  function renderGoals() {
+    const items = load(GOALS_KEY, []);
+    goalListEl.innerHTML = '';
+    if (items.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'Nothing here yet — add your first routine item.';
+      goalListEl.appendChild(li);
+      return;
+    }
+    items.forEach(function (item, i) {
+      const li = document.createElement('li');
+      li.className = 'gm-row' + (item.done ? ' gm-row-done' : '');
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'gm-check';
+      cb.checked = !!item.done;
+      cb.addEventListener('change', function () {
+        const list = load(GOALS_KEY, []); list[i].done = cb.checked; save(GOALS_KEY, list); renderGoals();
+      });
+
+      const txt = document.createElement('div');
+      txt.className = 'gm-text';
+      txt.textContent = item.text;
+      txt.contentEditable = 'true';
+      txt.addEventListener('blur', function () {
+        const list = load(GOALS_KEY, []); list[i].text = txt.textContent.trim(); save(GOALS_KEY, list);
+      });
+      txt.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); txt.blur(); } });
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = load(GOALS_KEY, []); list.splice(i, 1); save(GOALS_KEY, list); renderGoals();
+      });
+
+      li.append(cb, txt, del);
+      goalListEl.appendChild(li);
+    });
+  }
+
+  function addGoal() {
+    const text = goalInputEl.value.trim();
+    if (!text) return;
+    const list = load(GOALS_KEY, []);
+    list.push({ text: text, done: false });
+    save(GOALS_KEY, list);
+    goalInputEl.value = '';
+    renderGoals();
+  }
+  goalAddBtn.addEventListener('click', addGoal);
+  goalInputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') addGoal(); });
+
+  // ---- Progress log ----
+  const logListEl = document.getElementById('faceLogList');
+  const logDateEl = document.getElementById('faceLogDate');
+  const logCategoryEl = document.getElementById('faceLogCategory');
+  const logRatingEl = document.getElementById('faceLogRating');
+  const logNotesEl = document.getElementById('faceLogNotes');
+  const logAddBtn = document.getElementById('faceLogAdd');
+  logDateEl.value = todayStr();
+
+  function renderLog() {
+    const entries = load(LOG_KEY, [])
+      .slice()
+      .sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0); });
+
+    const weekStart = startOfWeek(new Date());
+    let weekCount = 0, ratingSum = 0, ratingCount = 0;
+    entries.forEach(function (e) {
+      const ed = new Date(e.date + 'T00:00:00');
+      if (ed >= weekStart) weekCount++;
+      if (e.rating) { ratingSum += Number(e.rating); ratingCount++; }
+    });
+
+    document.getElementById('faceWeekCount').textContent = weekCount;
+    document.getElementById('faceTotalCount').textContent = entries.length;
+    document.getElementById('faceAvgRating').textContent = ratingCount ? (Math.round((ratingSum / ratingCount) * 10) / 10) : '—';
+
+    logListEl.innerHTML = '';
+    if (entries.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'No entries yet — log how things are going below.';
+      logListEl.appendChild(li);
+      return;
+    }
+
+    entries.forEach(function (e) {
+      const meta = CATEGORY_META[e.category] || CATEGORY_META.general;
+      const li = document.createElement('li');
+      li.className = 'gm-row';
+
+      const icon = document.createElement('div');
+      icon.className = 'session-icon';
+      icon.textContent = meta.icon;
+
+      const main = document.createElement('div');
+      main.className = 'session-main';
+
+      const title = document.createElement('div');
+      title.className = 'session-title';
+      title.textContent = meta.label;
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'session-meta';
+      const parts = [fmtDate(e.date)];
+      if (e.rating) parts.push(e.rating + '/10');
+      metaLine.textContent = parts.join(' · ');
+
+      main.append(title, metaLine);
+      if (e.notes) {
+        const notes = document.createElement('div');
+        notes.className = 'session-notes';
+        notes.textContent = e.notes;
+        main.appendChild(notes);
+      }
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = load(LOG_KEY, []).filter(function (x) { return x.id !== e.id; });
+        save(LOG_KEY, list);
+        renderLog();
+      });
+
+      li.append(icon, main, del);
+      logListEl.appendChild(li);
+    });
+  }
+
+  logAddBtn.addEventListener('click', function () {
+    const notes = logNotesEl.value.trim();
+    const rating = Number(logRatingEl.value) || 0;
+    if (!notes && !rating) return;
+    const list = load(LOG_KEY, []);
+    list.push({
+      id: Date.now(),
+      date: logDateEl.value || todayStr(),
+      category: logCategoryEl.value,
+      rating: rating,
+      notes: notes,
+    });
+    save(LOG_KEY, list);
+    logRatingEl.value = '';
+    logNotesEl.value = '';
+    renderLog();
+  });
+
+  // ---- init ----
+  ensureGoalsSeeded();
+  renderProfile();
+  renderGoals();
+  renderLog();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({
+      appKey: 'face',
+      syncedKeys: [PROFILE_KEY, GOALS_KEY, LOG_KEY],
+      onApplied: function () { renderProfile(); renderGoals(); renderLog(); },
+    });
+  }
+})();
+</script>
+</body>
+</html>
