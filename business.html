@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Business · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --gold: #D9B36C;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(217,179,108,0.14), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(180,180,200,0.06), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 1100px; margin: 0 auto; }
+.dash-title {
+  margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section { margin-top: 8px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after  { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+.gm-card {
+  position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px;
+  margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45); overflow: hidden;
+}
+.gm-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.gm-header-left { display: flex; flex-direction: column; }
+.gm-eyebrow {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 6px;
+}
+.gm-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+.gm-streak {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); color: var(--text-tertiary);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase;
+}
+.gm-streak.gm-streak-set { background: rgba(217,179,108,0.12); border-color: rgba(217,179,108,0.35); color: #F0DDB2; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+.stat { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px; }
+.stat-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1; }
+.stat-label { margin-top: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.stat-income .stat-num { color: var(--success); }
+.stat-expense .stat-num { color: var(--danger); }
+.stat-net.is-positive .stat-num { color: var(--success); }
+.stat-net.is-negative .stat-num { color: var(--danger); }
+
+.gm-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.gm-field label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); }
+.gm-row-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.gm-row-fields > .gm-field { flex: 1; min-width: 140px; }
+
+.gm-input, .gm-select {
+  padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
+  outline: none; transition: border-color 0.2s, background 0.2s; width: 100%;
+}
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-input:focus, .gm-select:focus { border-color: rgba(255,255,255,0.28); background: rgba(0,0,0,0.36); }
+.gm-select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+
+.gm-input-wrap {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.gm-add {
+  padding: 11px 20px; border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.35), 0 8px 22px rgba(0,0,0,0.25);
+  transition: transform 0.1s, filter 0.15s;
+}
+.gm-add:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.gm-add:active { transform: translateY(0); }
+
+.goal-list { list-style: none; margin: 0; padding: 0; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+
+.gm-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+  transition: background 0.2s, opacity 0.3s;
+}
+.gm-row:hover { background: rgba(255,255,255,0.06); }
+.gm-row.gm-row-done { opacity: 0.45; background: rgba(107,227,164,0.04); }
+.gm-row.gm-row-done .gm-text { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
+
+.gm-check {
+  appearance: none; -webkit-appearance: none; width: 22px; height: 22px; flex-shrink: 0; margin: 0;
+  border: 1.5px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.28); border-radius: 7px;
+  position: relative; cursor: pointer; transition: background 0.2s, border-color 0.2s, box-shadow 0.25s;
+}
+.gm-check:checked { background: var(--success); border-color: var(--success); box-shadow: 0 0 12px rgba(107,227,164,0.40); }
+.gm-check:checked::after {
+  content: ''; position: absolute; left: 6px; top: 2px; width: 6px; height: 11px;
+  border: solid #0A0A0B; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+}
+.gm-text { flex: 1; font-size: 14px; color: var(--text-primary); outline: none; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
+.gm-text[contenteditable="true"] { outline: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.28); }
+
+.session-icon { font-size: 18px; width: 26px; text-align: center; flex-shrink: 0; }
+.session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.session-title { font-size: 14px; color: var(--text-primary); font-weight: 600; }
+.session-meta { font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); }
+.session-notes { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.amount-pos { color: var(--success); }
+.amount-neg { color: var(--danger); }
+
+.goal-delete {
+  border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer;
+  padding: 0 4px; opacity: 0.5; transition: opacity 0.2s, color 0.2s; flex-shrink: 0;
+}
+.gm-row:hover .goal-delete { opacity: 1; }
+.goal-delete:hover { color: var(--danger); }
+
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .gm-card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="dash-title">Business</h1>
+
+  <!-- ===== Brand profile ===== -->
+  <div class="section">
+    <div class="section-title">Brand Profile</div>
+    <div class="gm-card">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow">Your fashion brand</div>
+          <div class="gm-sub">Starting from zero is fine — fill in what you know now, the rest can wait.</div>
+        </div>
+        <span class="gm-streak" id="bizProfilePill">Not named yet</span>
+      </div>
+
+      <div class="gm-row-fields">
+        <div class="gm-field">
+          <label for="bizBrandName">Brand name</label>
+          <input class="gm-input" id="bizBrandName" type="text" placeholder="e.g. Studio Max">
+        </div>
+        <div class="gm-field">
+          <label for="bizNiche">Niche / category</label>
+          <input class="gm-input" id="bizNiche" type="text" placeholder="e.g. streetwear, minimalist basics">
+        </div>
+      </div>
+
+      <div class="gm-row-fields">
+        <div class="gm-field">
+          <label for="bizLaunchDate">Target launch date</label>
+          <input class="gm-input" id="bizLaunchDate" type="date">
+        </div>
+        <div class="gm-field">
+          <label for="bizBudget">Starting budget</label>
+          <input class="gm-input" id="bizBudget" type="number" min="0" step="10" inputmode="decimal" placeholder="2000">
+        </div>
+      </div>
+
+      <div class="gm-field">
+        <label for="bizNotes">Notes / vision</label>
+        <input class="gm-input" id="bizNotes" type="text" placeholder="What's the idea, who is it for?">
+      </div>
+
+      <div class="gm-input-wrap" style="border-top:0; padding-top:0; margin-top:0;">
+        <button class="gm-add" id="bizProfileSave" type="button">Save profile</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Money ===== -->
+  <div class="section">
+    <div class="section-title">Money</div>
+    <div class="gm-card">
+      <div class="stat-grid">
+        <div class="stat stat-income"><div class="stat-num" id="bizRevenue">$0</div><div class="stat-label">Revenue</div></div>
+        <div class="stat stat-expense"><div class="stat-num" id="bizExpenses">$0</div><div class="stat-label">Expenses</div></div>
+        <div class="stat stat-net" id="bizNetStat"><div class="stat-num" id="bizNet">$0</div><div class="stat-label">Net</div></div>
+      </div>
+
+      <ul class="goal-list" id="moneyList" style="margin-top:14px;"></ul>
+
+      <div class="gm-input-wrap">
+        <div class="gm-row-fields" style="width:100%; margin-bottom:0;">
+          <div class="gm-field">
+            <label for="moneyDate">Date</label>
+            <input class="gm-input" id="moneyDate" type="date">
+          </div>
+          <div class="gm-field">
+            <label for="moneyType">Type</label>
+            <select class="gm-select" id="moneyType">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </div>
+          <div class="gm-field">
+            <label for="moneyCategory">Category</label>
+            <input class="gm-input" id="moneyCategory" type="text" placeholder="e.g. samples, sales">
+          </div>
+          <div class="gm-field">
+            <label for="moneyAmount">Amount ($)</label>
+            <input class="gm-input" id="moneyAmount" type="number" min="0" step="1" inputmode="decimal" placeholder="150">
+          </div>
+        </div>
+        <div class="gm-field" style="width:100%;">
+          <label for="moneyNotes">Notes</label>
+          <input class="gm-input" id="moneyNotes" type="text" placeholder="Optional detail">
+        </div>
+        <button class="gm-add" id="moneyAdd" type="button">Add entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Roadmap ===== -->
+  <div class="section">
+    <div class="section-title">Roadmap</div>
+    <div class="gm-card">
+      <ul class="goal-list" id="milestoneList"></ul>
+
+      <div class="gm-input-wrap">
+        <input class="gm-input" id="milestoneInput" type="text" placeholder="Add a milestone…" autocomplete="off">
+        <button class="gm-add" id="milestoneAdd" type="button">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Contacts ===== -->
+  <div class="section">
+    <div class="section-title">Contacts</div>
+    <div class="gm-card">
+      <ul class="goal-list" id="contactList"></ul>
+
+      <div class="gm-input-wrap">
+        <div class="gm-row-fields" style="width:100%; margin-bottom:0;">
+          <div class="gm-field">
+            <label for="contactName">Name</label>
+            <input class="gm-input" id="contactName" type="text" placeholder="e.g. Studio XYZ">
+          </div>
+          <div class="gm-field">
+            <label for="contactRole">Role</label>
+            <select class="gm-select" id="contactRole">
+              <option value="manufacturer">Manufacturer</option>
+              <option value="supplier">Fabric / Supplier</option>
+              <option value="photographer">Photographer</option>
+              <option value="model">Model</option>
+              <option value="influencer">Influencer</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="gm-field">
+            <label for="contactInfo">Contact info</label>
+            <input class="gm-input" id="contactInfo" type="text" placeholder="email / phone / @handle">
+          </div>
+        </div>
+        <div class="gm-field" style="width:100%;">
+          <label for="contactNotes">Notes</label>
+          <input class="gm-input" id="contactNotes" type="text" placeholder="Optional detail">
+        </div>
+        <button class="gm-add" id="contactAdd" type="button">Add contact</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+
+<script>
+(function () {
+  'use strict';
+
+  const PROFILE_KEY = 'biz:profile';
+  const MILESTONES_KEY = 'biz:milestones';
+  const MONEY_KEY = 'biz:money';
+  const CONTACTS_KEY = 'biz:contacts';
+
+  const STARTER_MILESTONES = [
+    'Nail down your brand name & niche',
+    'Define your target customer',
+    'Sketch / mood-board your first collection',
+    'Get quotes from 2-3 manufacturers',
+    'Order samples',
+    'Build an Instagram presence',
+    'Set up an online store',
+    'Plan your first drop budget',
+  ];
+
+  const ROLE_META = {
+    manufacturer: { icon: '🏭', label: 'Manufacturer' },
+    supplier:     { icon: '🧵', label: 'Fabric / Supplier' },
+    photographer: { icon: '📷', label: 'Photographer' },
+    model:        { icon: '🧍', label: 'Model' },
+    influencer:   { icon: '📣', label: 'Influencer' },
+    other:        { icon: '⭐', label: 'Other' },
+  };
+
+  function load(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
+    catch (e) { return fallback; }
+  }
+  function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function fmtDate(s) {
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  function fmtMoney(n) {
+    const v = Number(n) || 0;
+    return (v < 0 ? '-$' : '$') + Math.abs(Math.round(v)).toLocaleString();
+  }
+
+  // ---- Brand profile ----
+  const brandNameEl = document.getElementById('bizBrandName');
+  const nicheEl = document.getElementById('bizNiche');
+  const launchDateEl = document.getElementById('bizLaunchDate');
+  const budgetEl = document.getElementById('bizBudget');
+  const notesEl = document.getElementById('bizNotes');
+  const profilePillEl = document.getElementById('bizProfilePill');
+  const profileSaveBtn = document.getElementById('bizProfileSave');
+
+  function renderProfile() {
+    const p = load(PROFILE_KEY, {});
+    brandNameEl.value = p.brandName || '';
+    nicheEl.value = p.niche || '';
+    launchDateEl.value = p.launchDate || '';
+    budgetEl.value = p.budget || '';
+    notesEl.value = p.notes || '';
+
+    if (p.brandName) {
+      profilePillEl.textContent = p.brandName;
+      profilePillEl.classList.add('gm-streak-set');
+    } else {
+      profilePillEl.textContent = 'Not named yet';
+      profilePillEl.classList.remove('gm-streak-set');
+    }
+  }
+  profileSaveBtn.addEventListener('click', function () {
+    save(PROFILE_KEY, {
+      brandName: brandNameEl.value.trim(),
+      niche: nicheEl.value.trim(),
+      launchDate: launchDateEl.value,
+      budget: Number(budgetEl.value) || 0,
+      notes: notesEl.value.trim(),
+    });
+    renderProfile();
+  });
+
+  // ---- Money ----
+  const moneyListEl = document.getElementById('moneyList');
+  const moneyDateEl = document.getElementById('moneyDate');
+  const moneyTypeEl = document.getElementById('moneyType');
+  const moneyCategoryEl = document.getElementById('moneyCategory');
+  const moneyAmountEl = document.getElementById('moneyAmount');
+  const moneyNotesEl = document.getElementById('moneyNotes');
+  const moneyAddBtn = document.getElementById('moneyAdd');
+  moneyDateEl.value = todayStr();
+
+  function renderMoney() {
+    const entries = load(MONEY_KEY, [])
+      .slice()
+      .sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0); });
+
+    let revenue = 0, expenses = 0;
+    entries.forEach(function (e) {
+      const amt = Number(e.amount) || 0;
+      if (e.type === 'income') revenue += amt; else expenses += amt;
+    });
+    const net = revenue - expenses;
+
+    document.getElementById('bizRevenue').textContent = fmtMoney(revenue);
+    document.getElementById('bizExpenses').textContent = fmtMoney(expenses);
+    document.getElementById('bizNet').textContent = fmtMoney(net);
+    const netStat = document.getElementById('bizNetStat');
+    netStat.classList.toggle('is-positive', net > 0);
+    netStat.classList.toggle('is-negative', net < 0);
+
+    moneyListEl.innerHTML = '';
+    if (entries.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'No money logged yet — add an expense or sale below.';
+      moneyListEl.appendChild(li);
+      return;
+    }
+
+    entries.forEach(function (e) {
+      const li = document.createElement('li');
+      li.className = 'gm-row';
+
+      const icon = document.createElement('div');
+      icon.className = 'session-icon';
+      icon.textContent = e.type === 'income' ? '💰' : '🧾';
+
+      const main = document.createElement('div');
+      main.className = 'session-main';
+
+      const title = document.createElement('div');
+      title.className = 'session-title';
+      title.textContent = e.category || (e.type === 'income' ? 'Income' : 'Expense');
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'session-meta';
+      const amtSpan = (e.type === 'income' ? '+' : '-') + fmtMoney(e.amount).replace('-', '').replace('$', '$');
+      metaLine.innerHTML = fmtDate(e.date) + ' · <span class="' + (e.type === 'income' ? 'amount-pos' : 'amount-neg') + '">' + (e.type === 'income' ? '+' : '-') + fmtMoney(Math.abs(Number(e.amount) || 0)) + '</span>';
+
+      main.append(title, metaLine);
+      if (e.notes) {
+        const notes = document.createElement('div');
+        notes.className = 'session-notes';
+        notes.textContent = e.notes;
+        main.appendChild(notes);
+      }
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = load(MONEY_KEY, []).filter(function (x) { return x.id !== e.id; });
+        save(MONEY_KEY, list);
+        renderMoney();
+      });
+
+      li.append(icon, main, del);
+      moneyListEl.appendChild(li);
+    });
+  }
+
+  moneyAddBtn.addEventListener('click', function () {
+    const amount = Number(moneyAmountEl.value) || 0;
+    if (!amount) return;
+    const list = load(MONEY_KEY, []);
+    list.push({
+      id: Date.now(),
+      date: moneyDateEl.value || todayStr(),
+      type: moneyTypeEl.value,
+      category: moneyCategoryEl.value.trim(),
+      amount: amount,
+      notes: moneyNotesEl.value.trim(),
+    });
+    save(MONEY_KEY, list);
+    moneyCategoryEl.value = '';
+    moneyAmountEl.value = '';
+    moneyNotesEl.value = '';
+    renderMoney();
+  });
+
+  // ---- Roadmap / milestones ----
+  const milestoneListEl = document.getElementById('milestoneList');
+  const milestoneInputEl = document.getElementById('milestoneInput');
+  const milestoneAddBtn = document.getElementById('milestoneAdd');
+
+  function ensureMilestonesSeeded() {
+    if (localStorage.getItem(MILESTONES_KEY) == null) {
+      save(MILESTONES_KEY, STARTER_MILESTONES.map(function (text) { return { text: text, done: false }; }));
+    }
+  }
+
+  function renderMilestones() {
+    const items = load(MILESTONES_KEY, []);
+    milestoneListEl.innerHTML = '';
+
+    if (items.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'No milestones yet — add your first step below.';
+      milestoneListEl.appendChild(li);
+      return;
+    }
+
+    items.forEach(function (item, i) {
+      const li = document.createElement('li');
+      li.className = 'gm-row' + (item.done ? ' gm-row-done' : '');
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'gm-check';
+      cb.checked = !!item.done;
+      cb.addEventListener('change', function () {
+        const list = load(MILESTONES_KEY, []); list[i].done = cb.checked; save(MILESTONES_KEY, list); renderMilestones();
+      });
+
+      const txt = document.createElement('div');
+      txt.className = 'gm-text';
+      txt.textContent = item.text;
+      txt.contentEditable = 'true';
+      txt.addEventListener('blur', function () {
+        const list = load(MILESTONES_KEY, []); list[i].text = txt.textContent.trim(); save(MILESTONES_KEY, list);
+      });
+      txt.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); txt.blur(); }
+      });
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = load(MILESTONES_KEY, []); list.splice(i, 1); save(MILESTONES_KEY, list); renderMilestones();
+      });
+
+      li.append(cb, txt, del);
+      milestoneListEl.appendChild(li);
+    });
+  }
+
+  function addMilestone() {
+    const text = milestoneInputEl.value.trim();
+    if (!text) return;
+    const list = load(MILESTONES_KEY, []);
+    list.push({ text: text, done: false });
+    save(MILESTONES_KEY, list);
+    milestoneInputEl.value = '';
+    renderMilestones();
+  }
+  milestoneAddBtn.addEventListener('click', addMilestone);
+  milestoneInputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') addMilestone(); });
+
+  // ---- Contacts ----
+  const contactListEl = document.getElementById('contactList');
+  const contactNameEl = document.getElementById('contactName');
+  const contactRoleEl = document.getElementById('contactRole');
+  const contactInfoEl = document.getElementById('contactInfo');
+  const contactNotesEl = document.getElementById('contactNotes');
+  const contactAddBtn = document.getElementById('contactAdd');
+
+  function renderContacts() {
+    const contacts = load(CONTACTS_KEY, []);
+    contactListEl.innerHTML = '';
+
+    if (contacts.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'No contacts yet — add a manufacturer, supplier, or collaborator below.';
+      contactListEl.appendChild(li);
+      return;
+    }
+
+    contacts.forEach(function (c) {
+      const meta = ROLE_META[c.role] || ROLE_META.other;
+      const li = document.createElement('li');
+      li.className = 'gm-row';
+
+      const icon = document.createElement('div');
+      icon.className = 'session-icon';
+      icon.textContent = meta.icon;
+
+      const main = document.createElement('div');
+      main.className = 'session-main';
+
+      const title = document.createElement('div');
+      title.className = 'session-title';
+      title.textContent = c.name || meta.label;
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'session-meta';
+      const parts = [meta.label];
+      if (c.info) parts.push(c.info);
+      metaLine.textContent = parts.join(' · ');
+
+      main.append(title, metaLine);
+      if (c.notes) {
+        const notes = document.createElement('div');
+        notes.className = 'session-notes';
+        notes.textContent = c.notes;
+        main.appendChild(notes);
+      }
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = load(CONTACTS_KEY, []).filter(function (x) { return x.id !== c.id; });
+        save(CONTACTS_KEY, list);
+        renderContacts();
+      });
+
+      li.append(icon, main, del);
+      contactListEl.appendChild(li);
+    });
+  }
+
+  contactAddBtn.addEventListener('click', function () {
+    const name = contactNameEl.value.trim();
+    if (!name) return;
+    const list = load(CONTACTS_KEY, []);
+    list.push({
+      id: Date.now(),
+      name: name,
+      role: contactRoleEl.value,
+      info: contactInfoEl.value.trim(),
+      notes: contactNotesEl.value.trim(),
+    });
+    save(CONTACTS_KEY, list);
+    contactNameEl.value = '';
+    contactInfoEl.value = '';
+    contactNotesEl.value = '';
+    renderContacts();
+  });
+
+  // ---- init ----
+  ensureMilestonesSeeded();
+  renderProfile();
+  renderMoney();
+  renderMilestones();
+  renderContacts();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({
+      appKey: 'business',
+      syncedKeys: [PROFILE_KEY, MILESTONES_KEY, MONEY_KEY, CONTACTS_KEY],
+      onApplied: function () { renderProfile(); renderMoney(); renderMilestones(); renderContacts(); },
+    });
+  }
+})();
+</script>
+</body>
+</html>
