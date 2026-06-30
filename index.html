@@ -71,7 +71,7 @@ body::after {
   --accent: #6BE3A4;                 /* each tile overrides this */
   position: relative; overflow: hidden;
   display: flex; flex-direction: column;
-  padding: 20px;
+  width: 100%; padding: 20px;
   border-radius: 18px;
   text-decoration: none;
   background: rgba(255,255,255,0.04);
@@ -80,6 +80,8 @@ body::after {
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   box-shadow: 0 12px 40px rgba(0,0,0,0.45);
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  font-family: inherit; color: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 /* The "its own style" bit — a faint accent glow per tile. */
 .tile::before {
@@ -204,6 +206,21 @@ body::after {
 .whoop-stat .l { font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 5px; }
 .whoop-btn { width: 100%; margin-top: 14px; padding: 11px; border: 1px solid rgba(255,255,255,0.12); border-radius: 11px; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: background 0.15s, color 0.15s; }
 .whoop-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+
+/* ===== Group picker rows ===== */
+.group-link-row {
+  display: flex; align-items: center; gap: 14px; padding: 14px;
+  border-radius: 14px; margin-bottom: 8px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06);
+  text-decoration: none; transition: background 0.15s, border-color 0.15s;
+}
+.group-link-row:last-child { margin-bottom: 0; }
+.group-link-row:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); }
+.group-link-emoji { font-size: 22px; line-height: 1; flex-shrink: 0; }
+.group-link-text { flex: 1; min-width: 0; }
+.group-link-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.group-link-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+.group-link-arrow { font-size: 16px; color: var(--text-tertiary); flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -235,8 +252,8 @@ body::after {
       </div>
     </a>
 
-    <!-- Wide tile -->
-    <a class="tile wide" href="gym.html" style="--accent:#7DD3FC">
+    <!-- Wide tile — group -->
+    <button class="tile wide" type="button" data-group="fitness" style="--accent:#7DD3FC">
       <div class="tile-top">
         <span class="tile-num">·02</span>
         <span class="tile-emoji">💪</span>
@@ -244,13 +261,13 @@ body::after {
       <div class="tile-spacer"></div>
       <h2 class="tile-title">Fitness</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Workouts, splits, sessions</span>
+        <span class="tile-sub">Workouts & Ironman training</span>
         <span class="tile-arrow">→</span>
       </div>
-    </a>
+    </button>
 
-    <!-- Small tile -->
-    <a class="tile" href="health.html" style="--accent:#A7F3D0">
+    <!-- Wide tile — group -->
+    <button class="tile wide" type="button" data-group="health" style="--accent:#A7F3D0">
       <div class="tile-top">
         <span class="tile-num">·03</span>
         <span class="tile-emoji">💊</span>
@@ -258,123 +275,50 @@ body::after {
       <div class="tile-spacer"></div>
       <h2 class="tile-title">Health</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Supplements & vitals</span>
+        <span class="tile-sub">Vitals, water & calories</span>
         <span class="tile-arrow">→</span>
       </div>
-    </a>
+    </button>
 
-    <!-- Small tile -->
-    <a class="tile" href="po-water.html" style="--accent:#60A5FA">
+    <!-- Wide tile — group -->
+    <button class="tile wide" type="button" data-group="money" style="--accent:#F2C063">
       <div class="tile-top">
         <span class="tile-num">·04</span>
-        <span class="tile-emoji">💧</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Water</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Hydration</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
-    <!-- Wide tile -->
-    <a class="tile wide" href="finance.html" style="--accent:#F2C063">
-      <div class="tile-top">
-        <span class="tile-num">·05</span>
         <span class="tile-emoji">📊</span>
       </div>
       <div class="tile-spacer"></div>
-      <h2 class="tile-title">Finance</h2>
+      <h2 class="tile-title">Money</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Net worth & spending</span>
+        <span class="tile-sub">Finance & business</span>
         <span class="tile-arrow">→</span>
       </div>
-    </a>
+    </button>
 
-    <!-- Small tile -->
-    <a class="tile" href="nova-lite.html" style="--accent:#A78BFA">
+    <!-- Small tile — group -->
+    <button class="tile" type="button" data-group="growth" style="--accent:#B9A7F2">
       <div class="tile-top">
-        <span class="tile-num">·06</span>
-        <span class="tile-emoji">🧠</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Nova</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Your AI mentor</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
-    <!-- Small tile -->
-    <a class="tile" href="ironman.html" style="--accent:#5BC8F2">
-      <div class="tile-top">
-        <span class="tile-num">·07</span>
-        <span class="tile-emoji">🏁</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Ironman</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Training log & goal</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
-    <!-- Wide tile -->
-    <a class="tile wide" href="business.html" style="--accent:#D9B36C">
-      <div class="tile-top">
-        <span class="tile-num">·08</span>
-        <span class="tile-emoji">🏷️</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Business</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Brand, money, roadmap & contacts</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
-    <!-- Small tile -->
-    <a class="tile" href="personality.html" style="--accent:#B9A7F2">
-      <div class="tile-top">
-        <span class="tile-num">·09</span>
+        <span class="tile-num">·05</span>
         <span class="tile-emoji">🌱</span>
       </div>
       <div class="tile-spacer"></div>
-      <h2 class="tile-title">Personality</h2>
+      <h2 class="tile-title">Growth</h2>
       <div class="tile-foot">
-        <span class="tile-sub">Growth & reflection</span>
+        <span class="tile-sub">Personality & face</span>
         <span class="tile-arrow">→</span>
       </div>
-    </a>
+    </button>
 
-    <!-- Small tile -->
-    <a class="tile" href="face.html" style="--accent:#F2A6B4">
-      <div class="tile-top">
-        <span class="tile-num">·10</span>
-        <span class="tile-emoji">✨</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Face</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Looksmaxxing routine</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
+  </div>
+</div>
 
-    <!-- Small tile -->
-    <a class="tile" href="calories.html" style="--accent:#FFAF66">
-      <div class="tile-top">
-        <span class="tile-num">·11</span>
-        <span class="tile-emoji">🍽️</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Calories</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Calories & protein</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
+<!-- ===== Group picker (grouped tiles open this instead of navigating directly) ===== -->
+<div class="modal-bg" id="groupModalBg">
+  <div class="modal" role="dialog" aria-label="Choose a page">
+    <div class="modal-head">
+      <span class="modal-title" id="groupModalTitle">Choose</span>
+      <button class="modal-close" id="groupModalClose" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="groupModalBody"></div>
   </div>
 </div>
 
@@ -621,6 +565,77 @@ body::after {
     if (!t || !t.access) { window.location.href = 'health.html'; return; }
     $('whAction').textContent = 'Syncing…'; syncWhoop();
   });
+})();
+</script>
+
+<script>
+(function () {
+  'use strict';
+  const GROUPS = {
+    fitness: {
+      title: 'Fitness',
+      items: [
+        { href: 'gym.html', emoji: '💪', title: 'Fitness', sub: 'Workouts, splits, sessions' },
+        { href: 'ironman.html', emoji: '🏁', title: 'Ironman', sub: 'Training log & goal' },
+      ],
+    },
+    health: {
+      title: 'Health',
+      items: [
+        { href: 'health.html', emoji: '💊', title: 'Health', sub: 'Supplements & vitals' },
+        { href: 'po-water.html', emoji: '💧', title: 'Water', sub: 'Hydration' },
+        { href: 'calories.html', emoji: '🍽️', title: 'Calories', sub: 'Calories & protein' },
+      ],
+    },
+    money: {
+      title: 'Money',
+      items: [
+        { href: 'finance.html', emoji: '📊', title: 'Finance', sub: 'Net worth & spending' },
+        { href: 'business.html', emoji: '🏷️', title: 'Business', sub: 'Brand, money, roadmap & contacts' },
+      ],
+    },
+    growth: {
+      title: 'Growth',
+      items: [
+        { href: 'personality.html', emoji: '🌱', title: 'Personality', sub: 'Growth & reflection' },
+        { href: 'face.html', emoji: '✨', title: 'Face', sub: 'Looksmaxxing routine' },
+      ],
+    },
+  };
+
+  const bg = document.getElementById('groupModalBg');
+  const titleEl = document.getElementById('groupModalTitle');
+  const bodyEl = document.getElementById('groupModalBody');
+  const closeBtn = document.getElementById('groupModalClose');
+
+  function openGroup(key) {
+    const g = GROUPS[key];
+    if (!g) return;
+    titleEl.textContent = g.title;
+    bodyEl.innerHTML = '';
+    g.items.forEach(function (item) {
+      const a = document.createElement('a');
+      a.className = 'group-link-row';
+      a.href = item.href;
+      a.innerHTML =
+        '<span class="group-link-emoji">' + item.emoji + '</span>' +
+        '<span class="group-link-text">' +
+          '<div class="group-link-title">' + item.title + '</div>' +
+          '<div class="group-link-sub">' + item.sub + '</div>' +
+        '</span>' +
+        '<span class="group-link-arrow">→</span>';
+      bodyEl.appendChild(a);
+    });
+    bg.classList.add('show');
+  }
+  function closeGroup() { bg.classList.remove('show'); }
+
+  document.querySelectorAll('[data-group]').forEach(function (btn) {
+    btn.addEventListener('click', function () { openGroup(btn.dataset.group); });
+  });
+  closeBtn.addEventListener('click', closeGroup);
+  bg.addEventListener('click', function (e) { if (e.target === bg) closeGroup(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeGroup(); });
 })();
 </script>
 </body>

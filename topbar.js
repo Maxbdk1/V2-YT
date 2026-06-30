@@ -96,6 +96,63 @@
   opacity: 0.85;
 }
 
+/* Nova — global floating mentor button, docked under the finance button */
+.novaFab {
+  position: fixed; top: 64px; right: 14px; z-index: 41;
+  width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; padding: 0;
+  overflow: hidden; -webkit-tap-highlight-color: transparent; transition: transform 0.12s;
+  background: radial-gradient(circle at 50% 58%, #8A6CFF, #4C2EC9 80%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 6px 22px rgba(124,92,255,0.55),
+              inset 0 -6px 14px rgba(38,10,86,0.65);
+}
+.novaFab:active { transform: scale(0.93); }
+.novaFab::before {
+  content: ''; position: absolute; inset: -28%; border-radius: 50%;
+  background: conic-gradient(from 0deg, #6D4AE0, #C9B8FF, #7C5CFF, #B98AFF, #8A6CFF, #6D4AE0);
+  filter: blur(2px); opacity: 0.92; animation: novaspin 7s linear infinite;
+}
+.novaFab::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 34% 26%, rgba(255,255,255,0.92), rgba(255,255,255,0) 40%),
+              radial-gradient(circle at 72% 82%, rgba(18,7,40,0.5), transparent 55%);
+}
+@keyframes novaspin { to { transform: rotate(360deg); } }
+.novaFab .nv2-online { position: absolute; right: 1px; bottom: 1px; z-index: 2; width: 11px; height: 11px; border-radius: 50%; background: #6ee7b7; border: 2px solid #0a0a0b; box-shadow: 0 0 6px rgba(110,231,183,0.7); }
+.novaPanel {
+  position: fixed; top: 112px; right: 14px; z-index: 41;
+  width: min(340px, calc(100vw - 28px)); max-height: 66vh; display: none; flex-direction: column;
+  background: #111016; border: 1px solid rgba(255,255,255,0.10); border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.65); overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+}
+.novaPanel.open { display: flex; }
+.nv2-head { display: flex; align-items: center; gap: 9px; padding: 13px 14px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.nv2-head .nv2-av { position: relative; overflow: hidden; width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: radial-gradient(circle at 34% 26%, rgba(255,255,255,0.85), rgba(255,255,255,0) 42%),
+             conic-gradient(from 0deg, #6D4AE0, #C9B8FF, #7C5CFF, #B98AFF, #6D4AE0); }
+.nv2-head .nv2-name { font-size: 14px; font-weight: 700; color: #FAFAFA; }
+.nv2-head .nv2-sub { font-size: 10.5px; color: #76746E; }
+.nv2-head .nv2-x { margin-left: auto; border: 0; background: transparent; color: #76746E; font-size: 20px; cursor: pointer; line-height: 1; }
+.nv2-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.nv2-msg { font-size: 13px; line-height: 1.5; max-width: 90%; padding: 9px 12px; border-radius: 13px; }
+.nv2-msg.coach { background: rgba(255,255,255,0.05); color: #E9E7E2; align-self: flex-start; border-bottom-left-radius: 4px; }
+.nv2-msg.user { background: rgba(124,92,255,0.22); color: #FAFAFA; align-self: flex-end; border-bottom-right-radius: 4px; }
+.nv2-msg b { color: #FAFAFA; } .nv2-msg ul { margin: 4px 0; padding-left: 18px; } .nv2-msg li { margin: 2px 0; }
+.nv2-quick { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 14px 10px; }
+.nv2-chip { border: 1px solid rgba(124,92,255,0.35); background: rgba(124,92,255,0.12); color: #CBBDFF; font-size: 11px; font-weight: 600; padding: 6px 10px; border-radius: 999px; cursor: pointer; }
+.nv2-chip:active { transform: scale(0.96); }
+.nv2-foot { display: flex; gap: 7px; padding: 11px 12px; border-top: 1px solid rgba(255,255,255,0.07); }
+.nv2-input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 11px; border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.32); color: #FAFAFA; font-family: inherit; font-size: 13px; outline: none; }
+.nv2-input::placeholder { color: #6c6a64; }
+.nv2-send { border: 0; border-radius: 11px; padding: 0 14px; background: linear-gradient(180deg,#C9B8FF,#7C5CFF); color: #14081f; font-weight: 700; font-size: 15px; cursor: pointer; }
+.nv2-dots i { display:inline-block; width:5px; height:5px; margin:0 1px; border-radius:50%; background:#9b8aff; animation: nv2b 1s infinite; }
+.nv2-dots i:nth-child(2){animation-delay:.15s} .nv2-dots i:nth-child(3){animation-delay:.3s}
+@keyframes nv2b { 0%,100%{opacity:.3;transform:translateY(0)} 50%{opacity:1;transform:translateY(-3px)} }
+@media (max-width: 480px) {
+  .novaFab { top: 58px; right: 10px; width: 40px; height: 40px; }
+  .novaPanel { top: 102px; right: 10px; }
+}
+
 /* Bottom tab bar — Instagram-style */
 .bottombar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
@@ -227,6 +284,26 @@ body.topbar-modal-open {
 </nav>
 `;
 
+  const novaHtml = `
+<button class="novaFab" id="novaFab" type="button" aria-label="Open Nova"><span class="nv2-online"></span></button>
+<div class="novaPanel" id="novaPanel" role="dialog" aria-label="Nova">
+  <div class="nv2-head">
+    <div class="nv2-av"></div>
+    <div><div class="nv2-name">Nova</div><div class="nv2-sub">your dashboard mentor</div></div>
+    <button class="nv2-x" id="novaClose" type="button" aria-label="Close">×</button>
+  </div>
+  <div class="nv2-body" id="novaBody"></div>
+  <div class="nv2-quick">
+    <button class="nv2-chip" data-q="Give me an overview of how everything is going across my dashboard and what to focus on next.">📊 Overview</button>
+    <button class="nv2-chip" data-q="What should I focus on today?">🎯 Today</button>
+  </div>
+  <div class="nv2-foot">
+    <input class="nv2-input" id="novaInput" type="text" placeholder="Ask Nova…" autocomplete="off">
+    <button class="nv2-send" id="novaSend" type="button">↑</button>
+  </div>
+</div>
+`;
+
   // Pages where we suppress the app chrome: finance has its own internal
   // 4-tab bottom nav and self-contained back button.
   function isFinancePage() {
@@ -240,6 +317,16 @@ body.topbar-modal-open {
   }
   function shouldShowChrome() {
     return !isFinancePage() && !isEmbedded();
+  }
+  // Pages that already have their own dedicated Nova integration — don't
+  // double up with the global floating button.
+  function hasOwnNovaWidget() {
+    const p = (window.location.pathname || '').toLowerCase();
+    return p.endsWith('/gym.html') || p.endsWith('gym.html') ||
+           p.endsWith('/nova-lite.html') || p.endsWith('nova-lite.html');
+  }
+  function shouldShowNova() {
+    return shouldShowChrome() && !hasOwnNovaWidget();
   }
   function currentPageKey() {
     const p = (window.location.pathname || '').toLowerCase();
@@ -264,6 +351,13 @@ body.topbar-modal-open {
     const bottomWrap = document.createElement('div');
     bottomWrap.innerHTML = bottombarHtml.trim();
     document.body.appendChild(bottomWrap.firstChild);
+
+    if (shouldShowNova()) {
+      const novaWrap = document.createElement('div');
+      novaWrap.id = 'novaWrap';
+      novaWrap.innerHTML = novaHtml.trim();
+      document.body.appendChild(novaWrap);
+    }
 
     // Highlight the active bottom tab.
     const active = currentPageKey();
@@ -462,9 +556,111 @@ body.topbar-modal-open {
     sync();
   }
 
+  // -------- Nova — global floating mentor (bring-your-own Anthropic key) --------
+  function wireNova() {
+    const fab = document.getElementById('novaFab');
+    if (!fab) return; // not injected on this page
+    const panel = document.getElementById('novaPanel');
+    const body = document.getElementById('novaBody');
+    const input = document.getElementById('novaInput');
+    const closeBtn = document.getElementById('novaClose');
+    const sendBtn = document.getElementById('novaSend');
+    const KEY_LS = 'nova_lite_api_key';
+    let busy = false, greeted = false;
+
+    function savedKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
+    function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+    function md(t) {
+      let h = esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code>$1</code>');
+      const lines = h.split('\n'); let out = '', inUl = false;
+      for (const ln of lines) {
+        if (/^\s*[-*]\s+/.test(ln)) { if (!inUl) { out += '<ul>'; inUl = true; } out += '<li>' + ln.replace(/^\s*[-*]\s+/, '') + '</li>'; }
+        else { if (inUl) { out += '</ul>'; inUl = false; } out += ln.trim() ? '<div>' + ln + '</div>' : ''; }
+      }
+      if (inUl) out += '</ul>';
+      return out;
+    }
+    function addMsg(role, html) {
+      const e = document.createElement('div');
+      e.className = 'nv2-msg ' + role;
+      e.innerHTML = html;
+      body.appendChild(e);
+      body.scrollTop = body.scrollHeight;
+      return e;
+    }
+    function dashboardData() {
+      const out = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k === KEY_LS) continue; // never send the key itself as data
+        try { out[k] = JSON.parse(localStorage.getItem(k)); } catch (e) { out[k] = localStorage.getItem(k); }
+      }
+      return out;
+    }
+    const SYS = "You are Nova, a personal mentor living inside the user's life-tracking dashboard. " +
+      "You can see their saved data across every tab (goals, gym, water, finance, calories, ironman training, business, personality, face/skincare, etc.). " +
+      "Give honest, specific, encouraging guidance. Answer in short markdown-style bullets starting with '- ', few words each, plain language. " +
+      "Wrap key words and numbers in **double asterisks**. End with one '- Do today:' bullet giving a single concrete action. " +
+      "Dashboard data as JSON:\n";
+
+    function openPanel() {
+      panel.classList.add('open');
+      if (!greeted) {
+        greeted = true;
+        addMsg('coach', md("Hey — I'm Nova. I can see your whole dashboard. Ask me anything, or tap a quick prompt below."));
+      }
+      setTimeout(() => input.focus(), 50);
+    }
+    function closePanel() { panel.classList.remove('open'); }
+    fab.addEventListener('click', () => { panel.classList.contains('open') ? closePanel() : openPanel(); });
+    closeBtn.addEventListener('click', closePanel);
+
+    async function ask(text) {
+      text = (text || '').trim();
+      if (!text || busy) return;
+      const key = savedKey();
+      addMsg('user', md(text));
+      input.value = '';
+      if (!key) { addMsg('coach', md('- Paste your **Anthropic API key** on the Nova page first (the 🧠 tile on Main) — it\'s saved in this browser and I\'ll use it here too.')); return; }
+      busy = true;
+      const loading = addMsg('coach', '<span class="nv2-dots"><i></i><i></i><i></i></span>');
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-opus-4-8',
+            max_tokens: 1024,
+            system: SYS + JSON.stringify(dashboardData()),
+            messages: [{ role: 'user', content: text }],
+          }),
+        });
+        const json = await res.json();
+        if (json.error) { loading.innerHTML = md('- ' + (json.error.message || 'Something went wrong — check your API key.')); busy = false; return; }
+        const reply = (json.content && json.content[0] && json.content[0].text) || 'Hmm, no reply.';
+        loading.innerHTML = md(reply);
+      } catch (e) {
+        loading.innerHTML = md('- Could not reach Anthropic (' + (e && e.message ? e.message : 'unknown error') + ') — check your connection and key.');
+      }
+      busy = false;
+    }
+
+    sendBtn.addEventListener('click', () => ask(input.value));
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(input.value); });
+    document.querySelectorAll('.nv2-chip').forEach((chip) => {
+      chip.addEventListener('click', () => { openPanel(); ask(chip.dataset.q); });
+    });
+  }
+
   // -------- Boot --------
   function boot() {
     injectStyleAndHTML();
+    wireNova();
     const btn = document.getElementById('topbarWaterAdd');
     if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); addWater(); });
     render();
