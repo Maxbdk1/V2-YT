@@ -205,7 +205,7 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: 
       loading.querySelector('div:last-child').innerHTML = render(reply);
       setOrb('happy'); setTimeout(() => setOrb(''), 2500);
     } catch(e){
-      loading.querySelector('div:last-child').innerHTML = render('- Could not reach Anthropic — check your connection and key.');
+      loading.querySelector('div:last-child').innerHTML = render('- Could not reach Anthropic (' + (e && e.message ? e.message : 'unknown error') + ') — check your connection and key.');
       setOrb('');
     }
     busy = false;
