@@ -132,6 +132,14 @@ body::after {
 .gm-ghost:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
 .gm-ghost:disabled { opacity: 0.5; cursor: default; }
 
+.recipe-log-btn {
+  padding: 7px 12px; border: 1px solid rgba(255,175,102,0.3); border-radius: 10px;
+  background: rgba(255,175,102,0.10); color: #FFD9B0;
+  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.recipe-log-btn:hover { background: rgba(255,175,102,0.20); }
+
 .goal-list { list-style: none; margin: 0; padding: 0; }
 .empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
 
@@ -276,9 +284,18 @@ body::after {
           </div>
         </div>
         <button class="gm-ghost" id="foodEstimate" type="button">✨ Estimate with AI</button>
+        <button class="gm-ghost" id="foodSaveRecipe" type="button">💾 Save as recipe</button>
         <button class="gm-add" id="foodAdd" type="button">Add entry</button>
         <div class="cal-breakdown" id="foodEstimateStatus"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== Saved recipes ===== -->
+  <div class="section">
+    <div class="section-title">Saved Recipes</div>
+    <div class="gm-card">
+      <ul class="goal-list" id="recipeList"></ul>
     </div>
   </div>
 
@@ -291,6 +308,7 @@ body::after {
   const WATER_KEY = 'po_water_v1';
   const CAL_PROFILE_KEY = 'cal:profile';
   const LOG_KEY = 'cal:log';
+  const RECIPES_KEY = 'cal:recipes';
 
   const GOAL_LABELS = {
     lose_fast: 'Lose weight (faster)',
@@ -604,15 +622,107 @@ body::after {
     foodEstimateBtn.disabled = false;
   });
 
+  // ---- Saved recipes ----
+  const recipeListEl = document.getElementById('recipeList');
+  const foodSaveRecipeBtn = document.getElementById('foodSaveRecipe');
+
+  function renderRecipes() {
+    const recipes = load(RECIPES_KEY, []);
+    recipeListEl.innerHTML = '';
+    if (recipes.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'No saved recipes yet — fill in a food above and hit "Save as recipe".';
+      recipeListEl.appendChild(li);
+      return;
+    }
+
+    recipes.forEach(function (r) {
+      const li = document.createElement('li');
+      li.className = 'gm-row';
+
+      const icon = document.createElement('div');
+      icon.className = 'session-icon';
+      icon.textContent = '📖';
+
+      const main = document.createElement('div');
+      main.className = 'session-main';
+
+      const title = document.createElement('div');
+      title.className = 'session-title';
+      title.textContent = r.name;
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'session-meta';
+      const parts = [(r.calories || 0) + ' kcal', (r.protein || 0) + 'g protein'];
+      if (r.carbs) parts.push(r.carbs + 'g carbs');
+      if (r.fat) parts.push(r.fat + 'g fat');
+      metaLine.textContent = parts.join(' · ');
+
+      main.append(title, metaLine);
+
+      const logBtn = document.createElement('button');
+      logBtn.className = 'recipe-log-btn';
+      logBtn.type = 'button';
+      logBtn.textContent = '+ Log';
+      logBtn.addEventListener('click', function () {
+        const list = load(LOG_KEY, []);
+        list.push({
+          id: Date.now(),
+          date: foodDateEl.value || todayStr(),
+          name: r.name,
+          calories: r.calories || 0,
+          protein: r.protein || 0,
+          carbs: r.carbs || 0,
+          fat: r.fat || 0,
+        });
+        save(LOG_KEY, list);
+        renderLog();
+      });
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = load(RECIPES_KEY, []).filter(function (x) { return x.id !== r.id; });
+        save(RECIPES_KEY, list);
+        renderRecipes();
+      });
+
+      li.append(icon, main, logBtn, del);
+      recipeListEl.appendChild(li);
+    });
+  }
+
+  foodSaveRecipeBtn.addEventListener('click', function () {
+    const name = foodNameEl.value.trim();
+    const calories = Number(foodCaloriesEl.value) || 0;
+    if (!name || !calories) { setEstimateStatus('Need a food name and calories before saving as a recipe.'); return; }
+    const list = load(RECIPES_KEY, []);
+    list.push({
+      id: Date.now(),
+      name: name,
+      calories: calories,
+      protein: Number(foodProteinEl.value) || 0,
+      carbs: Number(foodCarbsEl.value) || 0,
+      fat: Number(foodFatEl.value) || 0,
+    });
+    save(RECIPES_KEY, list);
+    setEstimateStatus('Saved "' + name + '" as a recipe.');
+    renderRecipes();
+  });
+
   // ---- init ----
   renderTargets();
   renderLog();
+  renderRecipes();
 
   if (window.initCloudSync) {
     window.initCloudSync({
       appKey: 'calories',
-      syncedKeys: [CAL_PROFILE_KEY, LOG_KEY],
-      onApplied: function () { renderTargets(); renderLog(); },
+      syncedKeys: [CAL_PROFILE_KEY, LOG_KEY, RECIPES_KEY],
+      onApplied: function () { renderTargets(); renderLog(); renderRecipes(); },
     });
   }
 })();
