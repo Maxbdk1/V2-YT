@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Calories · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --cal: #FFAF66;
+  --protein: #7DD3FC;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255,175,102,0.14), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(125,211,252,0.07), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 1100px; margin: 0 auto; }
+.dash-title {
+  margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section { margin-top: 8px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after  { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+.gm-card {
+  position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px;
+  margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45); overflow: hidden;
+}
+.gm-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.gm-header-left { display: flex; flex-direction: column; }
+.gm-eyebrow {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 6px;
+}
+.gm-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+.gm-streak {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); color: var(--text-tertiary);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase;
+}
+.gm-streak.gm-streak-set { background: rgba(255,175,102,0.12); border-color: rgba(255,175,102,0.35); color: #FFE0BD; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+.stat { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px; }
+.stat-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1; }
+.stat-label { margin-top: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.stat-cal .stat-num { color: var(--cal); }
+.stat-protein .stat-num { color: var(--protein); }
+.stat-over .stat-num { color: var(--danger); }
+
+.gm-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.gm-field label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); }
+.gm-row-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.gm-row-fields > .gm-field { flex: 1; min-width: 140px; }
+
+.gm-input, .gm-select {
+  padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
+  outline: none; transition: border-color 0.2s, background 0.2s; width: 100%;
+}
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-input:focus, .gm-select:focus { border-color: rgba(255,255,255,0.28); background: rgba(0,0,0,0.36); }
+.gm-select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+
+.gm-input-wrap {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.gm-add {
+  padding: 11px 20px; border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.35), 0 8px 22px rgba(0,0,0,0.25);
+  transition: transform 0.1s, filter 0.15s;
+}
+.gm-add:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.gm-add:active { transform: translateY(0); }
+
+.goal-list { list-style: none; margin: 0; padding: 0; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+
+.gm-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+  transition: background 0.2s;
+}
+.gm-row:hover { background: rgba(255,255,255,0.06); }
+.session-icon { font-size: 18px; width: 26px; text-align: center; flex-shrink: 0; }
+.session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.session-title { font-size: 14px; color: var(--text-primary); font-weight: 600; }
+.session-meta { font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+.goal-delete {
+  border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer;
+  padding: 0 4px; opacity: 0.5; transition: opacity 0.2s, color 0.2s; flex-shrink: 0;
+}
+.gm-row:hover .goal-delete { opacity: 1; }
+.goal-delete:hover { color: var(--danger); }
+
+.cal-incomplete {
+  padding: 12px 14px; border-radius: 12px; background: rgba(255,107,107,0.08);
+  border: 1px solid rgba(255,107,107,0.25); font-size: 13px; color: #FFD1D1;
+}
+.cal-incomplete a { color: #FFE9E9; text-decoration: underline; }
+
+.cal-breakdown { margin-top: 12px; font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .gm-card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="dash-title">Calories</h1>
+
+  <!-- ===== Targets ===== -->
+  <div class="section">
+    <div class="section-title">Targets</div>
+    <div class="gm-card">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow">Based on your profile</div>
+          <div class="gm-sub">Pulled from weight / height / age / activity in Main → ⚙ Settings. Change those there to update this.</div>
+        </div>
+        <span class="gm-streak" id="calGoalPill">Maintain</span>
+      </div>
+
+      <div id="calIncomplete" class="cal-incomplete" style="display:none;">
+        Add your weight, height, age and sex in <a href="index.html">Main → ⚙ Settings</a> first — targets need those to calculate.
+      </div>
+
+      <div id="calTargetsBody">
+        <div class="gm-row-fields">
+          <div class="gm-field">
+            <label for="calGoal">Goal</label>
+            <select class="gm-select" id="calGoal">
+              <option value="lose_fast">Lose weight (faster, −750 kcal/day)</option>
+              <option value="lose">Lose weight (−500 kcal/day)</option>
+              <option value="maintain">Maintain</option>
+              <option value="gain">Gain weight (+300 kcal/day)</option>
+              <option value="gain_fast">Gain weight (faster, +500 kcal/day)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="gm-row-fields">
+          <div class="gm-field">
+            <label for="calCustomCalories">Custom calorie target (optional)</label>
+            <input class="gm-input" id="calCustomCalories" type="number" min="0" placeholder="leave blank to use calculated">
+          </div>
+          <div class="gm-field">
+            <label for="calCustomProtein">Custom protein target g (optional)</label>
+            <input class="gm-input" id="calCustomProtein" type="number" min="0" placeholder="leave blank to use calculated">
+          </div>
+        </div>
+
+        <div class="gm-input-wrap" style="border-top:0; padding-top:0; margin-top:0;">
+          <button class="gm-add" id="calGoalSave" type="button">Save</button>
+        </div>
+
+        <div class="cal-breakdown" id="calBreakdown"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Today ===== -->
+  <div class="section">
+    <div class="section-title">Today</div>
+    <div class="gm-card">
+      <div class="stat-grid">
+        <div class="stat stat-cal"><div class="stat-num" id="todayCalEaten">0</div><div class="stat-label">Calories eaten</div></div>
+        <div class="stat" id="todayCalRemainingStat"><div class="stat-num" id="todayCalRemaining">0</div><div class="stat-label">Remaining</div></div>
+        <div class="stat stat-protein"><div class="stat-num" id="todayProteinEaten">0</div><div class="stat-label">Protein (g)</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Food log ===== -->
+  <div class="section">
+    <div class="section-title">Food Log</div>
+    <div class="gm-card">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-num" id="weekAvgCal">0</div><div class="stat-label">Avg kcal / day (7d)</div></div>
+        <div class="stat"><div class="stat-num" id="weekAvgProtein">0</div><div class="stat-label">Avg protein (7d)</div></div>
+        <div class="stat"><div class="stat-num" id="totalEntries">0</div><div class="stat-label">Entries logged</div></div>
+      </div>
+
+      <ul class="goal-list" id="foodList" style="margin-top:14px;"></ul>
+
+      <div class="gm-input-wrap">
+        <div class="gm-row-fields" style="width:100%; margin-bottom:0;">
+          <div class="gm-field">
+            <label for="foodDate">Date</label>
+            <input class="gm-input" id="foodDate" type="date">
+          </div>
+          <div class="gm-field">
+            <label for="foodName">Food</label>
+            <input class="gm-input" id="foodName" type="text" placeholder="e.g. chicken breast & rice">
+          </div>
+        </div>
+        <div class="gm-row-fields" style="width:100%; margin-bottom:0;">
+          <div class="gm-field">
+            <label for="foodCalories">Calories</label>
+            <input class="gm-input" id="foodCalories" type="number" min="0" placeholder="450">
+          </div>
+          <div class="gm-field">
+            <label for="foodProtein">Protein (g)</label>
+            <input class="gm-input" id="foodProtein" type="number" min="0" placeholder="40">
+          </div>
+          <div class="gm-field">
+            <label for="foodCarbs">Carbs (g)</label>
+            <input class="gm-input" id="foodCarbs" type="number" min="0" placeholder="optional">
+          </div>
+          <div class="gm-field">
+            <label for="foodFat">Fat (g)</label>
+            <input class="gm-input" id="foodFat" type="number" min="0" placeholder="optional">
+          </div>
+        </div>
+        <button class="gm-add" id="foodAdd" type="button">Add entry</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+
+<script>
+(function () {
+  'use strict';
+
+  const WATER_KEY = 'po_water_v1';
+  const CAL_PROFILE_KEY = 'cal:profile';
+  const LOG_KEY = 'cal:log';
+
+  const GOAL_LABELS = {
+    lose_fast: 'Lose weight (faster)',
+    lose: 'Lose weight',
+    maintain: 'Maintain',
+    gain: 'Gain weight',
+    gain_fast: 'Gain weight (faster)',
+  };
+  const GOAL_ADJUST = {
+    lose_fast: -750,
+    lose: -500,
+    maintain: 0,
+    gain: 300,
+    gain_fast: 500,
+  };
+
+  function load(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
+    catch (e) { return fallback; }
+  }
+  function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function fmtDate(s) {
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  function activityMultiplier(hrsPerWeek) {
+    const h = hrsPerWeek || 0;
+    if (h < 1) return 1.2;
+    if (h < 3) return 1.375;
+    if (h < 6) return 1.55;
+    if (h < 10) return 1.725;
+    return 1.9;
+  }
+
+  function getBodyProfile() {
+    const w = load(WATER_KEY, {});
+    return (w && w.profile) || {};
+  }
+
+  function computeTargets() {
+    const p = getBodyProfile();
+    const calProfile = load(CAL_PROFILE_KEY, { goal: 'maintain', customCalories: null, customProtein: null });
+    const complete = p.weightKg && p.heightCm && p.age && p.sex;
+    if (!complete) return { complete: false, goal: calProfile.goal };
+
+    const bmr = p.sex === 'f'
+      ? (10 * p.weightKg + 6.25 * p.heightCm - 5 * p.age - 161)
+      : (10 * p.weightKg + 6.25 * p.heightCm - 5 * p.age + 5);
+    const mult = activityMultiplier(p.activityHrsPerWeek);
+    const tdee = bmr * mult;
+    const adjust = GOAL_ADJUST[calProfile.goal] != null ? GOAL_ADJUST[calProfile.goal] : 0;
+    const calcCalories = Math.round(tdee + adjust);
+    const calcProtein = Math.round(p.weightKg * 1.8);
+
+    return {
+      complete: true,
+      goal: calProfile.goal,
+      bmr: Math.round(bmr),
+      tdee: Math.round(tdee),
+      calorieTarget: calProfile.customCalories || calcCalories,
+      proteinTarget: calProfile.customProtein || calcProtein,
+      calcCalories: calcCalories,
+      calcProtein: calcProtein,
+    };
+  }
+
+  // ---- Targets UI ----
+  const goalEl = document.getElementById('calGoal');
+  const customCaloriesEl = document.getElementById('calCustomCalories');
+  const customProteinEl = document.getElementById('calCustomProtein');
+  const goalPillEl = document.getElementById('calGoalPill');
+  const incompleteEl = document.getElementById('calIncomplete');
+  const targetsBodyEl = document.getElementById('calTargetsBody');
+  const breakdownEl = document.getElementById('calBreakdown');
+  const goalSaveBtn = document.getElementById('calGoalSave');
+
+  function renderTargets() {
+    const calProfile = load(CAL_PROFILE_KEY, { goal: 'maintain', customCalories: null, customProtein: null });
+    goalEl.value = calProfile.goal || 'maintain';
+    customCaloriesEl.value = calProfile.customCalories || '';
+    customProteinEl.value = calProfile.customProtein || '';
+    goalPillEl.textContent = GOAL_LABELS[calProfile.goal] || 'Maintain';
+
+    const t = computeTargets();
+    if (!t.complete) {
+      incompleteEl.style.display = '';
+      targetsBodyEl.style.display = 'none';
+      return;
+    }
+    incompleteEl.style.display = 'none';
+    targetsBodyEl.style.display = '';
+    breakdownEl.textContent =
+      'BMR ' + t.bmr + ' kcal · TDEE ' + t.tdee + ' kcal · Target ' + t.calorieTarget + ' kcal · Protein ' + t.proteinTarget + ' g';
+    renderToday();
+  }
+
+  goalSaveBtn.addEventListener('click', function () {
+    save(CAL_PROFILE_KEY, {
+      goal: goalEl.value,
+      customCalories: Number(customCaloriesEl.value) || null,
+      customProtein: Number(customProteinEl.value) || null,
+    });
+    renderTargets();
+  });
+
+  // ---- Today stats ----
+  function renderToday() {
+    const t = computeTargets();
+    const entries = load(LOG_KEY, []);
+    const today = todayStr();
+    let calEaten = 0, proteinEaten = 0;
+    entries.forEach(function (e) {
+      if (e.date === today) { calEaten += Number(e.calories) || 0; proteinEaten += Number(e.protein) || 0; }
+    });
+
+    document.getElementById('todayCalEaten').textContent = calEaten;
+    document.getElementById('todayProteinEaten').textContent = proteinEaten;
+
+    const remainingStat = document.getElementById('todayCalRemainingStat');
+    const remainingEl = document.getElementById('todayCalRemaining');
+    if (t.complete) {
+      const remaining = t.calorieTarget - calEaten;
+      remainingEl.textContent = remaining;
+      remainingStat.classList.toggle('stat-over', remaining < 0);
+    } else {
+      remainingEl.textContent = '—';
+      remainingStat.classList.remove('stat-over');
+    }
+  }
+
+  // ---- Food log ----
+  const foodListEl = document.getElementById('foodList');
+  const foodDateEl = document.getElementById('foodDate');
+  const foodNameEl = document.getElementById('foodName');
+  const foodCaloriesEl = document.getElementById('foodCalories');
+  const foodProteinEl = document.getElementById('foodProtein');
+  const foodCarbsEl = document.getElementById('foodCarbs');
+  const foodFatEl = document.getElementById('foodFat');
+  const foodAddBtn = document.getElementById('foodAdd');
+  foodDateEl.value = todayStr();
+
+  function startOfWeek(d) {
+    const x = new Date(d); x.setHours(0, 0, 0, 0);
+    const day = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - day);
+    return x;
+  }
+
+  function renderLog() {
+    const entries = load(LOG_KEY, [])
+      .slice()
+      .sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0); });
+
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); sevenDaysAgo.setHours(0, 0, 0, 0);
+    const byDay = {};
+    entries.forEach(function (e) {
+      const ed = new Date(e.date + 'T00:00:00');
+      if (ed >= sevenDaysAgo) {
+        byDay[e.date] = byDay[e.date] || { cal: 0, protein: 0 };
+        byDay[e.date].cal += Number(e.calories) || 0;
+        byDay[e.date].protein += Number(e.protein) || 0;
+      }
+    });
+    const days = Object.keys(byDay);
+    const avgCal = days.length ? Math.round(days.reduce(function (s, d) { return s + byDay[d].cal; }, 0) / days.length) : 0;
+    const avgProtein = days.length ? Math.round(days.reduce(function (s, d) { return s + byDay[d].protein; }, 0) / days.length) : 0;
+
+    document.getElementById('weekAvgCal').textContent = avgCal;
+    document.getElementById('weekAvgProtein').textContent = avgProtein;
+    document.getElementById('totalEntries').textContent = entries.length;
+
+    foodListEl.innerHTML = '';
+    if (entries.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'No food logged yet — add your first entry below.';
+      foodListEl.appendChild(li);
+      renderToday();
+      return;
+    }
+
+    entries.forEach(function (e) {
+      const li = document.createElement('li');
+      li.className = 'gm-row';
+
+      const icon = document.createElement('div');
+      icon.className = 'session-icon';
+      icon.textContent = '🍽️';
+
+      const main = document.createElement('div');
+      main.className = 'session-main';
+
+      const title = document.createElement('div');
+      title.className = 'session-title';
+      title.textContent = e.name || 'Food';
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'session-meta';
+      const parts = [fmtDate(e.date), (e.calories || 0) + ' kcal', (e.protein || 0) + 'g protein'];
+      if (e.carbs) parts.push(e.carbs + 'g carbs');
+      if (e.fat) parts.push(e.fat + 'g fat');
+      metaLine.textContent = parts.join(' · ');
+
+      main.append(title, metaLine);
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = load(LOG_KEY, []).filter(function (x) { return x.id !== e.id; });
+        save(LOG_KEY, list);
+        renderLog();
+      });
+
+      li.append(icon, main, del);
+      foodListEl.appendChild(li);
+    });
+
+    renderToday();
+  }
+
+  foodAddBtn.addEventListener('click', function () {
+    const name = foodNameEl.value.trim();
+    const calories = Number(foodCaloriesEl.value) || 0;
+    if (!name || !calories) return;
+    const list = load(LOG_KEY, []);
+    list.push({
+      id: Date.now(),
+      date: foodDateEl.value || todayStr(),
+      name: name,
+      calories: calories,
+      protein: Number(foodProteinEl.value) || 0,
+      carbs: Number(foodCarbsEl.value) || 0,
+      fat: Number(foodFatEl.value) || 0,
+    });
+    save(LOG_KEY, list);
+    foodNameEl.value = '';
+    foodCaloriesEl.value = '';
+    foodProteinEl.value = '';
+    foodCarbsEl.value = '';
+    foodFatEl.value = '';
+    renderLog();
+  });
+
+  // ---- init ----
+  renderTargets();
+  renderLog();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({
+      appKey: 'calories',
+      syncedKeys: [CAL_PROFILE_KEY, LOG_KEY],
+      onApplied: function () { renderTargets(); renderLog(); },
+    });
+  }
+})();
+</script>
+</body>
+</html>
