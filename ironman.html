@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="lock.js"></script>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Ironman · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --swim: #5BC8F2;
+  --bike: #F2A65A;
+  --run:  #FF8FA3;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(91,200,242,0.14), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(255,143,163,0.07), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift { 0%{transform:translate3d(0,0,0)} 100%{transform:translate3d(-22px,14px,0)} }
+
+.page { max-width: 1100px; margin: 0 auto; }
+.dash-title {
+  margin: 0 0 14px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section { margin-top: 8px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+.section-title::after  { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+.gm-card {
+  position: relative; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 20px;
+  margin-bottom: 14px; backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45); overflow: hidden;
+}
+.gm-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.gm-header-left { display: flex; flex-direction: column; }
+.gm-eyebrow {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 6px;
+}
+.gm-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+.gm-streak {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); color: var(--text-tertiary);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase;
+}
+.gm-streak.gm-streak-set { background: rgba(91,200,242,0.10); border-color: rgba(91,200,242,0.32); color: #BCE6FB; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+.stat { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px; }
+.stat-num {
+  font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
+  color: var(--text-primary); line-height: 1;
+}
+.stat-label { margin-top: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.stat-swim .stat-num { color: var(--swim); }
+.stat-bike .stat-num { color: var(--bike); }
+.stat-run  .stat-num { color: var(--run); }
+
+.gm-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.gm-field label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); }
+.gm-row-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.gm-row-fields > .gm-field { flex: 1; min-width: 140px; }
+
+.gm-input, .gm-select {
+  padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px;
+  outline: none; transition: border-color 0.2s, background 0.2s; width: 100%;
+}
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-input:focus, .gm-select:focus { border-color: rgba(255,255,255,0.28); background: rgba(0,0,0,0.36); }
+.gm-select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+
+.gm-input-wrap {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.gm-add {
+  padding: 11px 20px; border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.35), 0 8px 22px rgba(0,0,0,0.25);
+  transition: transform 0.1s, filter 0.15s;
+}
+.gm-add:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.gm-add:active { transform: translateY(0); }
+
+.goal-list { list-style: none; margin: 0; padding: 0; }
+.empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
+
+.gm-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+  transition: background 0.2s;
+}
+.gm-row:hover { background: rgba(255,255,255,0.06); }
+.session-icon { font-size: 18px; width: 26px; text-align: center; flex-shrink: 0; }
+.session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.session-title { font-size: 14px; color: var(--text-primary); font-weight: 600; }
+.session-meta { font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); }
+.session-notes { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.goal-delete {
+  border: 0; background: transparent; color: var(--text-tertiary); font-size: 18px; cursor: pointer;
+  padding: 0 4px; opacity: 0.5; transition: opacity 0.2s, color 0.2s; flex-shrink: 0;
+}
+.gm-row:hover .goal-delete { opacity: 1; }
+.goal-delete:hover { color: var(--danger); }
+
+.iron-countdown {
+  margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(91,200,242,0.08); border: 1px solid rgba(91,200,242,0.22);
+  font-size: 13px; color: #D9F0FB;
+}
+.iron-countdown.no-race { background: rgba(255,255,255,0.035); border-color: rgba(255,255,255,0.06); color: var(--text-tertiary); }
+.iron-countdown b { color: var(--text-primary); font-family: var(--font-mono); }
+
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .gm-card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="dash-title">Ironman Training</h1>
+
+  <!-- ===== Race goal ===== -->
+  <div class="section">
+    <div class="section-title">Race Goal</div>
+    <div class="gm-card">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow">Where you're headed</div>
+          <div class="gm-sub">No experience yet — that's fine. Pick a target once you have one, or just start logging sessions below.</div>
+        </div>
+        <span class="gm-streak" id="ironGoalPill">No race set</span>
+      </div>
+
+      <div class="gm-row-fields">
+        <div class="gm-field">
+          <label for="ironDistance">Target distance</label>
+          <select class="gm-select" id="ironDistance">
+            <option value="">Not decided yet</option>
+            <option value="sprint">Sprint Tri (750m / 20km / 5km)</option>
+            <option value="olympic">Olympic Tri (1.5km / 40km / 10km)</option>
+            <option value="half">Half Ironman 70.3 (1.9km / 90km / 21.1km)</option>
+            <option value="full">Full Ironman (3.8km / 180km / 42.2km)</option>
+          </select>
+        </div>
+        <div class="gm-field">
+          <label for="ironRaceDate">Race date</label>
+          <input class="gm-input" id="ironRaceDate" type="date">
+        </div>
+      </div>
+
+      <div class="gm-field">
+        <label for="ironGoalNotes">Notes</label>
+        <input class="gm-input" id="ironGoalNotes" type="text" placeholder="e.g. first triathlon ever, just want to finish">
+      </div>
+
+      <div class="gm-input-wrap" style="border-top:0; padding-top:0; margin-top:0;">
+        <button class="gm-add" id="ironGoalSave" type="button">Save goal</button>
+      </div>
+
+      <div class="iron-countdown" id="ironCountdown">Set a date once you've picked a race — we'll count it down for you.</div>
+    </div>
+  </div>
+
+  <!-- ===== This week ===== -->
+  <div class="section">
+    <div class="section-title">This Week</div>
+    <div class="gm-card">
+      <div class="stat-grid">
+        <div class="stat stat-swim"><div class="stat-num" id="weekSwim">0</div><div class="stat-label">Swim (km)</div></div>
+        <div class="stat stat-bike"><div class="stat-num" id="weekBike">0</div><div class="stat-label">Bike (km)</div></div>
+        <div class="stat stat-run"><div class="stat-num" id="weekRun">0</div><div class="stat-label">Run (km)</div></div>
+        <div class="stat"><div class="stat-num" id="weekSessions">0</div><div class="stat-label">Sessions</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== All time ===== -->
+  <div class="section">
+    <div class="section-title">All Time</div>
+    <div class="gm-card">
+      <div class="stat-grid">
+        <div class="stat stat-swim"><div class="stat-num" id="totalSwim">0</div><div class="stat-label">Swim (km)</div></div>
+        <div class="stat stat-bike"><div class="stat-num" id="totalBike">0</div><div class="stat-label">Bike (km)</div></div>
+        <div class="stat stat-run"><div class="stat-num" id="totalRun">0</div><div class="stat-label">Run (km)</div></div>
+        <div class="stat"><div class="stat-num" id="totalHours">0</div><div class="stat-label">Hours trained</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Training log ===== -->
+  <div class="section">
+    <div class="section-title">Training Log</div>
+    <div class="gm-card">
+      <ul class="goal-list" id="sessionList"></ul>
+
+      <div class="gm-input-wrap">
+        <div class="gm-row-fields" style="width:100%; margin-bottom:0;">
+          <div class="gm-field">
+            <label for="sessDate">Date</label>
+            <input class="gm-input" id="sessDate" type="date">
+          </div>
+          <div class="gm-field">
+            <label for="sessDiscipline">Type</label>
+            <select class="gm-select" id="sessDiscipline">
+              <option value="swim">🏊 Swim</option>
+              <option value="bike">🚴 Bike</option>
+              <option value="run">🏃 Run</option>
+              <option value="strength">🏋️ Strength</option>
+              <option value="other">⭐ Other</option>
+            </select>
+          </div>
+          <div class="gm-field">
+            <label for="sessDuration">Duration (min)</label>
+            <input class="gm-input" id="sessDuration" type="number" min="0" inputmode="numeric" placeholder="45">
+          </div>
+          <div class="gm-field">
+            <label for="sessDistance">Distance (km)</label>
+            <input class="gm-input" id="sessDistance" type="number" min="0" step="0.1" inputmode="decimal" placeholder="5.0">
+          </div>
+        </div>
+        <div class="gm-field" style="width:100%;">
+          <label for="sessNotes">Notes</label>
+          <input class="gm-input" id="sessNotes" type="text" placeholder="How did it feel?">
+        </div>
+        <button class="gm-add" id="sessAdd" type="button">Add session</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+
+<script>
+(function () {
+  'use strict';
+
+  const GOAL_KEY = 'iron:goal';
+  const SESSIONS_KEY = 'iron:sessions';
+
+  const DISCIPLINE_META = {
+    swim:     { icon: '🏊', label: 'Swim' },
+    bike:     { icon: '🚴', label: 'Bike' },
+    run:      { icon: '🏃', label: 'Run' },
+    strength: { icon: '🏋️', label: 'Strength' },
+    other:    { icon: '⭐', label: 'Other' },
+  };
+  const DISTANCE_LABELS = {
+    sprint:  'Sprint Triathlon',
+    olympic: 'Olympic Triathlon',
+    half:    'Half Ironman (70.3)',
+    full:    'Full Ironman',
+  };
+
+  function loadGoal() {
+    try { return JSON.parse(localStorage.getItem(GOAL_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveGoal(g) { localStorage.setItem(GOAL_KEY, JSON.stringify(g)); }
+
+  function loadSessions() {
+    try { return JSON.parse(localStorage.getItem(SESSIONS_KEY)) || []; } catch (e) { return []; }
+  }
+  function saveSessions(list) { localStorage.setItem(SESSIONS_KEY, JSON.stringify(list)); }
+
+  // ---- Goal ----
+  const distanceEl = document.getElementById('ironDistance');
+  const raceDateEl = document.getElementById('ironRaceDate');
+  const goalNotesEl = document.getElementById('ironGoalNotes');
+  const goalPillEl = document.getElementById('ironGoalPill');
+  const countdownEl = document.getElementById('ironCountdown');
+  const goalSaveBtn = document.getElementById('ironGoalSave');
+
+  function renderGoal() {
+    const g = loadGoal();
+    distanceEl.value = g.distance || '';
+    raceDateEl.value = g.raceDate || '';
+    goalNotesEl.value = g.notes || '';
+
+    if (g.distance) {
+      goalPillEl.textContent = DISTANCE_LABELS[g.distance] || 'Race set';
+      goalPillEl.classList.add('gm-streak-set');
+    } else {
+      goalPillEl.textContent = 'No race set';
+      goalPillEl.classList.remove('gm-streak-set');
+    }
+
+    if (g.raceDate) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const race = new Date(g.raceDate + 'T00:00:00');
+      const days = Math.round((race - today) / 86400000);
+      countdownEl.classList.remove('no-race');
+      if (days > 0) countdownEl.innerHTML = '<b>' + days + ' day' + (days === 1 ? '' : 's') + '</b> until race day. Keep logging sessions.';
+      else if (days === 0) countdownEl.innerHTML = '<b>Today\'s the day.</b> Go get it.';
+      else countdownEl.innerHTML = 'Race day was <b>' + Math.abs(days) + ' day' + (Math.abs(days) === 1 ? '' : 's') + '</b> ago.';
+    } else {
+      countdownEl.classList.add('no-race');
+      countdownEl.textContent = "Set a date once you've picked a race — we'll count it down for you.";
+    }
+  }
+
+  goalSaveBtn.addEventListener('click', function () {
+    saveGoal({
+      distance: distanceEl.value,
+      raceDate: raceDateEl.value,
+      notes: goalNotesEl.value.trim(),
+    });
+    renderGoal();
+  });
+
+  // ---- Sessions ----
+  const sessionListEl = document.getElementById('sessionList');
+  const sessDateEl = document.getElementById('sessDate');
+  const sessDisciplineEl = document.getElementById('sessDiscipline');
+  const sessDurationEl = document.getElementById('sessDuration');
+  const sessDistanceEl = document.getElementById('sessDistance');
+  const sessNotesEl = document.getElementById('sessNotes');
+  const sessAddBtn = document.getElementById('sessAdd');
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  sessDateEl.value = todayStr();
+
+  function startOfWeek(d) {
+    const x = new Date(d); x.setHours(0, 0, 0, 0);
+    const day = (x.getDay() + 6) % 7; // Monday = 0
+    x.setDate(x.getDate() - day);
+    return x;
+  }
+
+  function fmtDate(s) {
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  function round1(n) { return Math.round(n * 10) / 10; }
+
+  function renderStats() {
+    const sessions = loadSessions();
+    const weekStart = startOfWeek(new Date());
+
+    let wkSwim = 0, wkBike = 0, wkRun = 0, wkCount = 0;
+    let totSwim = 0, totBike = 0, totRun = 0, totMin = 0;
+
+    sessions.forEach(function (s) {
+      const km = Number(s.distanceKm) || 0;
+      const min = Number(s.durationMin) || 0;
+      totMin += min;
+      if (s.discipline === 'swim') totSwim += km;
+      if (s.discipline === 'bike') totBike += km;
+      if (s.discipline === 'run') totRun += km;
+
+      const sd = new Date(s.date + 'T00:00:00');
+      if (sd >= weekStart) {
+        wkCount++;
+        if (s.discipline === 'swim') wkSwim += km;
+        if (s.discipline === 'bike') wkBike += km;
+        if (s.discipline === 'run') wkRun += km;
+      }
+    });
+
+    document.getElementById('weekSwim').textContent = round1(wkSwim);
+    document.getElementById('weekBike').textContent = round1(wkBike);
+    document.getElementById('weekRun').textContent = round1(wkRun);
+    document.getElementById('weekSessions').textContent = wkCount;
+
+    document.getElementById('totalSwim').textContent = round1(totSwim);
+    document.getElementById('totalBike').textContent = round1(totBike);
+    document.getElementById('totalRun').textContent = round1(totRun);
+    document.getElementById('totalHours').textContent = round1(totMin / 60);
+  }
+
+  function renderSessions() {
+    const sessions = loadSessions()
+      .slice()
+      .sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0); });
+
+    sessionListEl.innerHTML = '';
+    if (sessions.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'No sessions logged yet — add your first one below.';
+      sessionListEl.appendChild(li);
+      renderStats();
+      return;
+    }
+
+    sessions.forEach(function (s) {
+      const meta = DISCIPLINE_META[s.discipline] || DISCIPLINE_META.other;
+      const li = document.createElement('li');
+      li.className = 'gm-row';
+
+      const icon = document.createElement('div');
+      icon.className = 'session-icon';
+      icon.textContent = meta.icon;
+
+      const main = document.createElement('div');
+      main.className = 'session-main';
+
+      const title = document.createElement('div');
+      title.className = 'session-title';
+      title.textContent = meta.label;
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'session-meta';
+      const parts = [fmtDate(s.date)];
+      if (s.durationMin) parts.push(s.durationMin + ' min');
+      if (s.distanceKm) parts.push(s.distanceKm + ' km');
+      metaLine.textContent = parts.join(' · ');
+
+      main.append(title, metaLine);
+      if (s.notes) {
+        const notes = document.createElement('div');
+        notes.className = 'session-notes';
+        notes.textContent = s.notes;
+        main.appendChild(notes);
+      }
+
+      const del = document.createElement('button');
+      del.className = 'goal-delete';
+      del.type = 'button';
+      del.textContent = '×';
+      del.addEventListener('click', function () {
+        const list = loadSessions().filter(function (x) { return x.id !== s.id; });
+        saveSessions(list);
+        renderSessions();
+      });
+
+      li.append(icon, main, del);
+      sessionListEl.appendChild(li);
+    });
+
+    renderStats();
+  }
+
+  sessAddBtn.addEventListener('click', function () {
+    const date = sessDateEl.value || todayStr();
+    const discipline = sessDisciplineEl.value;
+    const durationMin = Number(sessDurationEl.value) || 0;
+    const distanceKm = Number(sessDistanceEl.value) || 0;
+    const notes = sessNotesEl.value.trim();
+    if (!durationMin && !distanceKm) return;
+
+    const list = loadSessions();
+    list.push({ id: Date.now(), date: date, discipline: discipline, durationMin: durationMin, distanceKm: distanceKm, notes: notes });
+    saveSessions(list);
+
+    sessDurationEl.value = '';
+    sessDistanceEl.value = '';
+    sessNotesEl.value = '';
+    renderSessions();
+  });
+
+  renderGoal();
+  renderSessions();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({
+      appKey: 'ironman',
+      syncedKeys: [GOAL_KEY, SESSIONS_KEY],
+      onApplied: function () { renderGoal(); renderSessions(); },
+    });
+  }
+})();
+</script>
+</body>
+</html>
