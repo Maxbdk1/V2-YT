@@ -657,10 +657,26 @@ body.topbar-modal-open {
     });
   }
 
+  // Pin the Nova button just under the topbar's real rendered height
+  // (varies by device safe-area-inset-top) instead of a hardcoded px value,
+  // so it never overlaps or gets clipped by the topbar above it.
+  function positionNova() {
+    const topbarEl = document.getElementById('topbar');
+    const fab = document.getElementById('novaFab');
+    if (!topbarEl || !fab) return;
+    const panel = document.getElementById('novaPanel');
+    const fabTop = Math.round(topbarEl.getBoundingClientRect().bottom + 10);
+    fab.style.top = fabTop + 'px';
+    if (panel) panel.style.top = (fabTop + fab.offsetHeight + 8) + 'px';
+  }
+
   // -------- Boot --------
   function boot() {
     injectStyleAndHTML();
     wireNova();
+    positionNova();
+    window.addEventListener('resize', positionNova);
+    window.addEventListener('orientationchange', positionNova);
     const btn = document.getElementById('topbarWaterAdd');
     if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); addWater(); });
     render();
