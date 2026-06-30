@@ -123,6 +123,15 @@ body::after {
 .gm-add:hover { filter: brightness(1.06); transform: translateY(-1px); }
 .gm-add:active { transform: translateY(0); }
 
+.gm-ghost {
+  padding: 11px 18px; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
+  background: rgba(255,255,255,0.04); color: var(--text-primary);
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gm-ghost:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
+.gm-ghost:disabled { opacity: 0.5; cursor: default; }
+
 .goal-list { list-style: none; margin: 0; padding: 0; }
 .empty-state { text-align: center; font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 14px 0; }
 
@@ -244,29 +253,31 @@ body::after {
             <input class="gm-input" id="foodDate" type="date">
           </div>
           <div class="gm-field">
-            <label for="foodName">Food</label>
-            <input class="gm-input" id="foodName" type="text" placeholder="e.g. chicken breast & rice">
+            <label for="foodName">Food — describe it, AI estimates the rest</label>
+            <input class="gm-input" id="foodName" type="text" placeholder="e.g. chicken breast & rice, or 2 eggs and toast">
           </div>
         </div>
         <div class="gm-row-fields" style="width:100%; margin-bottom:0;">
           <div class="gm-field">
             <label for="foodCalories">Calories</label>
-            <input class="gm-input" id="foodCalories" type="number" min="0" placeholder="450">
+            <input class="gm-input" id="foodCalories" type="number" min="0" placeholder="auto">
           </div>
           <div class="gm-field">
             <label for="foodProtein">Protein (g)</label>
-            <input class="gm-input" id="foodProtein" type="number" min="0" placeholder="40">
+            <input class="gm-input" id="foodProtein" type="number" min="0" placeholder="auto">
           </div>
           <div class="gm-field">
             <label for="foodCarbs">Carbs (g)</label>
-            <input class="gm-input" id="foodCarbs" type="number" min="0" placeholder="optional">
+            <input class="gm-input" id="foodCarbs" type="number" min="0" placeholder="auto">
           </div>
           <div class="gm-field">
             <label for="foodFat">Fat (g)</label>
-            <input class="gm-input" id="foodFat" type="number" min="0" placeholder="optional">
+            <input class="gm-input" id="foodFat" type="number" min="0" placeholder="auto">
           </div>
         </div>
+        <button class="gm-ghost" id="foodEstimate" type="button">✨ Estimate with AI</button>
         <button class="gm-add" id="foodAdd" type="button">Add entry</button>
+        <div class="cal-breakdown" id="foodEstimateStatus"></div>
       </div>
     </div>
   </div>
@@ -528,6 +539,69 @@ body::after {
     foodCarbsEl.value = '';
     foodFatEl.value = '';
     renderLog();
+  });
+
+  // ---- AI calorie/macro estimation ----
+  // Shares the same Anthropic key as the Nova pages (Main → Nova tile), so the
+  // user only has to paste their key once across the dashboard.
+  const NOVA_KEY_LS = 'nova_lite_api_key';
+  function savedNovaKey() { try { return localStorage.getItem(NOVA_KEY_LS) || ''; } catch (e) { return ''; } }
+
+  const foodEstimateBtn = document.getElementById('foodEstimate');
+  const foodEstimateStatus = document.getElementById('foodEstimateStatus');
+
+  function setEstimateStatus(text) { foodEstimateStatus.textContent = text || ''; }
+
+  foodEstimateBtn.addEventListener('click', async function () {
+    const food = foodNameEl.value.trim();
+    if (!food) { setEstimateStatus('Type what you ate first.'); return; }
+
+    const key = savedNovaKey();
+    if (!key) { setEstimateStatus('Paste your Anthropic API key on the Nova page first (🧠 tile on Main), then come back here.'); return; }
+
+    const t = computeTargets();
+    const p = getBodyProfile();
+    const personalContext = t.complete
+      ? ('The person weighs ' + p.weightKg + 'kg and has a daily target of ' + t.calorieTarget + ' kcal and ' + t.proteinTarget + 'g protein. '
+         + 'If they did not specify a quantity, assume a realistic single-serving portion sized for someone with that body weight and target — '
+         + 'not an unusually large or small portion.')
+      : 'No body-weight profile is set yet — assume an average adult single serving if no quantity is given.';
+
+    foodEstimateBtn.disabled = true;
+    setEstimateStatus('Estimating…');
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-8',
+          max_tokens: 200,
+          system: 'You are a nutrition estimator inside a personal dashboard. ' + personalContext
+            + ' Estimate calories, protein, carbs and fat for the food the user describes. '
+            + 'Respond with ONLY a JSON object, no prose, no markdown fences: {"calories":number,"protein":number,"carbs":number,"fat":number}',
+          messages: [{ role: 'user', content: food }],
+        }),
+      });
+      const json = await res.json();
+      if (json.error) { setEstimateStatus(json.error.message || 'Estimate failed — check your API key.'); foodEstimateBtn.disabled = false; return; }
+      const text = (json.content && json.content[0] && json.content[0].text) || '';
+      const match = text.match(/\{[\s\S]*\}/);
+      const parsed = JSON.parse(match ? match[0] : text);
+
+      foodCaloriesEl.value = Math.round(parsed.calories) || '';
+      foodProteinEl.value = Math.round(parsed.protein) || '';
+      foodCarbsEl.value = Math.round(parsed.carbs) || '';
+      foodFatEl.value = Math.round(parsed.fat) || '';
+      setEstimateStatus('Estimated — review and hit Add entry.');
+    } catch (e) {
+      setEstimateStatus('Could not reach Anthropic (' + (e && e.message ? e.message : 'unknown error') + ').');
+    }
+    foodEstimateBtn.disabled = false;
   });
 
   // ---- init ----
